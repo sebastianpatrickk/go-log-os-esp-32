@@ -124,32 +124,35 @@ void sendAttendanceRequest(int userId) {
       StaticJsonDocument<200> doc;
       DeserializationError error = deserializeJson(doc, response);
       
+      lcd.clear();
       if (error) {
         lcd.print("JSON Error");
         lcd.setCursor(0, 1);
-        lcd.print("----------------");
-        lcd.setCursor(0, 2);
         lcd.print(error.c_str());
       } else {
         const char* message = doc["data"]["message"];
         String msg = message;
         
-        lcd.print("Response received:");
-        lcd.setCursor(0, 1);
-        lcd.print("----------------");
-        
-        if (msg.length() > 40) {
-          lcd.setCursor(0, 2);
+        // Using all 4 lines (20x4 = 80 characters total)
+        if (msg.length() > 60) {
           lcd.print(msg.substring(0, 20));
-          lcd.setCursor(0, 3);
+          lcd.setCursor(0, 1);
           lcd.print(msg.substring(20, 40));
-        } else if (msg.length() > 20) {
           lcd.setCursor(0, 2);
-          lcd.print(msg.substring(0, 20));
+          lcd.print(msg.substring(40, 60));
           lcd.setCursor(0, 3);
+          lcd.print(msg.substring(60, 80));
+        } else if (msg.length() > 40) {
+          lcd.print(msg.substring(0, 20));
+          lcd.setCursor(0, 1);
+          lcd.print(msg.substring(20, 40));
+          lcd.setCursor(0, 2);
+          lcd.print(msg.substring(40));
+        } else if (msg.length() > 20) {
+          lcd.print(msg.substring(0, 20));
+          lcd.setCursor(0, 1);
           lcd.print(msg.substring(20));
         } else {
-          lcd.setCursor(0, 2);
           lcd.print(msg);
         }
       }
