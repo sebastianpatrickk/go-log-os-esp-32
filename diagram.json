@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "author": "Sebastian Patrick Klen",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": -192, "left": 52.84, "attrs": {} },
+    { "type": "wokwi-microsd-card", "id": "sd1", "top": -66.97, "left": 211.27, "attrs": {} },
+    {
+      "type": "wokwi-pushbutton-6mm",
+      "id": "btn1",
+      "top": 65,
+      "left": 153.6,
+      "attrs": { "color": "green" }
+    },
+    {
+      "type": "board-ssd1306",
+      "id": "oled2",
+      "top": -73.66,
+      "left": 432.23,
+      "attrs": { "i2cAddress": "0x3c" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "sd1:SCK", "esp:18", "green", [ "h38.4", "v-57.61", "h-172.8" ] ],
+    [ "btn1:1.r", "esp:15", "red", [ "v0" ] ],
+    [ "btn1:2.r", "esp:GND.2", "black", [ "h10.4", "v-249.2" ] ],
+    [ "sd1:VCC", "esp:3V3", "red", [ "h48", "v-182.26", "h-288", "v38.4" ] ],
+    [ "sd1:CS", "esp:5", "green", [ "h67.2", "v-76.74" ] ],
+    [ "sd1:GND", "esp:GND.2", "black", [ "h28.8", "v-124.69" ] ],
+    [ "sd1:DO", "esp:19", "green", [ "h19.2", "v-47.89" ] ],
+    [ "sd1:DI", "esp:23", "green", [ "h57.6", "v-144.09" ] ],
+    [ "oled2:GND", "esp:GND.2", "black", [ "v-38.4", "h-259.2" ] ],
+    [ "oled2:VCC", "esp:3V3", "red", [ "h-9.6", "v-182.3", "h-345.75" ] ],
+    [ "oled2:SDA", "esp:21", "green", [ "h-19.2", "v29" ] ],
+    [ "oled2:SCL", "esp:22", "green", [ "h-28.8", "v-9.3" ] ]
+  ],
+  "dependencies": {}
+}

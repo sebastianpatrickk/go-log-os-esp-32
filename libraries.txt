@@ -1,0 +1,4 @@
+LiquidCrystal I2C
+ArduinoJson
+Adafruit GFX Library
+Adafruit SSD1306
