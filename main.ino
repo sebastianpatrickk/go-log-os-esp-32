@@ -3,6 +3,7 @@
 #include <SD.h>
 #include <time.h>
 #include <LiquidCrystal_I2C.h>
+#include <ArduinoJson.h>
 
 const char* ssid = "Wokwi-GUEST";
 const char* password = "";
@@ -14,8 +15,8 @@ const int daylightOffset_sec = 3600;
 const int buttonPin = 15;
 const int sdCSPin = 5;
 
-// Initialize LCD (0x27 is the default I2C address for LCD1602)
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+// Initialize LCD (0x27 is the default I2C address, 20x4 display)
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 bool lastButtonState = HIGH;
 bool currentButtonState = HIGH;
@@ -40,7 +41,7 @@ void setup() {
   Serial.println("SD card initialized.");
 
   lcd.clear();
-  lcd.print("Connecting WiFi..");
+  lcd.print("Connecting to WiFi...");
   WiFi.begin(ssid, password); 
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -52,9 +53,13 @@ void setup() {
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   
   lcd.clear();
-  lcd.print("Ready!");
+  lcd.print("System Ready!");
   lcd.setCursor(0, 1);
-  lcd.print("Press button...");
+  lcd.print("----------------");
+  lcd.setCursor(0, 2);
+  lcd.print("Press button to mark");
+  lcd.setCursor(0, 3);
+  lcd.print("attendance");
 }
 
 void loop() {
@@ -86,7 +91,7 @@ int readUserIdFromSD() {
 void sendAttendanceRequest(int userId) {
   if (WiFi.status() == WL_CONNECTED) {
     lcd.clear();
-    lcd.print("Sending...");
+    lcd.print("Sending attendance...");
     lcd.setCursor(0, 1);
     lcd.print("UserID: " + String(userId));
     
@@ -116,25 +121,62 @@ void sendAttendanceRequest(int userId) {
       Serial.println("HTTP Response code: " + String(httpResponseCode));
       Serial.println("Response: " + response);
       
-      lcd.print("Success!");
-      lcd.setCursor(0, 1);
-      lcd.print("Code: " + String(httpResponseCode));
+      StaticJsonDocument<200> doc;
+      DeserializationError error = deserializeJson(doc, response);
+      
+      if (error) {
+        lcd.print("JSON Error");
+        lcd.setCursor(0, 1);
+        lcd.print("----------------");
+        lcd.setCursor(0, 2);
+        lcd.print(error.c_str());
+      } else {
+        const char* message = doc["data"]["message"];
+        String msg = message;
+        
+        lcd.print("Response received:");
+        lcd.setCursor(0, 1);
+        lcd.print("----------------");
+        
+        if (msg.length() > 40) {
+          lcd.setCursor(0, 2);
+          lcd.print(msg.substring(0, 20));
+          lcd.setCursor(0, 3);
+          lcd.print(msg.substring(20, 40));
+        } else if (msg.length() > 20) {
+          lcd.setCursor(0, 2);
+          lcd.print(msg.substring(0, 20));
+          lcd.setCursor(0, 3);
+          lcd.print(msg.substring(20));
+        } else {
+          lcd.setCursor(0, 2);
+          lcd.print(msg);
+        }
+      }
     } else {
       Serial.println("Error on HTTP request");
       Serial.println("Error code: " + String(httpResponseCode));
       
-      lcd.print("Error!");
+      lcd.print("Connection Error!");
       lcd.setCursor(0, 1);
-      lcd.print("Code: " + String(httpResponseCode));
+      lcd.print("----------------");
+      lcd.setCursor(0, 2);
+      lcd.print("Please check your");
+      lcd.setCursor(0, 3);
+      lcd.print("network connection");
     }
 
     http.end();
     
-    // Reset display after 2 seconds
-    delay(2000);
+    // Reset display after 3 seconds
+    delay(3000);
     lcd.clear();
-    lcd.print("Ready!");
+    lcd.print("System Ready!");
     lcd.setCursor(0, 1);
-    lcd.print("Press button...");
+    lcd.print("----------------");
+    lcd.setCursor(0, 2);
+    lcd.print("Press button to mark");
+    lcd.setCursor(0, 3);
+    lcd.print("attendance");
   }
 }
