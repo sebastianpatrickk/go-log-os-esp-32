@@ -2,8 +2,17 @@
 #include <HTTPClient.h>
 #include <SD.h>
 #include <time.h>
-#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include <ArduinoJson.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+#define SCREEN_ADDRESS 0x3C
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 const char* ssid = "Wokwi-GUEST";
 const char* password = "";
@@ -15,33 +24,78 @@ const int daylightOffset_sec = 3600;
 const int buttonPin = 15;
 const int sdCSPin = 5;
 
-// Initialize LCD (0x27 is the default I2C address, 20x4 display)
-LiquidCrystal_I2C lcd(0x27, 20, 4);
-
 bool lastButtonState = HIGH;
 bool currentButtonState = HIGH;
 
+void showMessage(const String& message) {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.cp437(true);
+
+  const unsigned int charPerLine = 16;
+  const int lineHeight = 10;
+  const int maxLines = 6;
+  int currentLine = 0;
+  String msg = message;
+
+  msg.replace("\\n", "\n");
+  
+  while (msg.length() > 0 && currentLine < maxLines) {
+    String line;
+    int newlineIndex = msg.indexOf('\n');
+    
+    if (newlineIndex >= 0) {
+      line = msg.substring(0, newlineIndex);
+      msg = msg.substring(newlineIndex + 1);
+    } else {
+      line = msg;
+      msg = "";
+    }
+    
+    while (line.length() > 0 && currentLine < maxLines) {
+      unsigned int endIndex = (line.length() < charPerLine) ? line.length() : charPerLine;
+      
+      if (endIndex < line.length() && line.charAt(endIndex) != ' ') {
+        int lastSpace = line.substring(0, endIndex).lastIndexOf(' ');
+        if (lastSpace > 0) {
+          endIndex = (unsigned int)lastSpace;
+        }
+      }
+
+      display.setCursor(0, currentLine * lineHeight);
+      display.println(line.substring(0, endIndex));
+      
+      line = line.substring(endIndex);
+      line.trim();
+      currentLine++;
+    }
+  }
+  
+  display.display();
+}
+
 void setup() {
   Serial.begin(115200);
-  
-  // Initialize LCD
-  lcd.init();
-  lcd.backlight();
-  lcd.clear();
-  lcd.print("Initializing...");
+
+  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    return;
+  }
+  display.clearDisplay();
   
   pinMode(buttonPin, INPUT_PULLUP);
   
+  showMessage("Initializing...");
+  
   if (!SD.begin(sdCSPin)) {
     Serial.println("SD card initialization failed!");
-    lcd.clear();
-    lcd.print("SD Card Failed!");
+    showMessage("SD Card Failed!");
     return;
   }
   Serial.println("SD card initialized.");
 
-  lcd.clear();
-  lcd.print("Connecting to WiFi...");
+  showMessage("Connecting to WiFi...");
   WiFi.begin(ssid, password); 
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -52,14 +106,7 @@ void setup() {
   
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   
-  lcd.clear();
-  lcd.print("System Ready!");
-  lcd.setCursor(0, 1);
-  lcd.print("----------------");
-  lcd.setCursor(0, 2);
-  lcd.print("Press button to mark");
-  lcd.setCursor(0, 3);
-  lcd.print("attendance");
+  showMessage("System Ready!\n\nPress button to\nmark attendance");
 }
 
 void loop() {
@@ -90,10 +137,7 @@ int readUserIdFromSD() {
 
 void sendAttendanceRequest(int userId) {
   if (WiFi.status() == WL_CONNECTED) {
-    lcd.clear();
-    lcd.print("Sending attendance...");
-    lcd.setCursor(0, 1);
-    lcd.print("UserID: " + String(userId));
+    showMessage("Sending...\nUserID: " + String(userId));
     
     HTTPClient http;
     
@@ -103,8 +147,7 @@ void sendAttendanceRequest(int userId) {
     struct tm timeinfo;
     if(!getLocalTime(&timeinfo)) {
       Serial.println("Failed to obtain time");
-      lcd.clear();
-      lcd.print("Time Error!");
+      showMessage("Time Error!");
       return;
     }
     
@@ -115,7 +158,6 @@ void sendAttendanceRequest(int userId) {
     
     int httpResponseCode = http.POST(jsonPayload);
 
-    lcd.clear();
     if (httpResponseCode > 0) {
       String response = http.getString();
       Serial.println("HTTP Response code: " + String(httpResponseCode));
@@ -124,62 +166,22 @@ void sendAttendanceRequest(int userId) {
       StaticJsonDocument<200> doc;
       DeserializationError error = deserializeJson(doc, response);
       
-      lcd.clear();
       if (error) {
-        lcd.print("JSON Error");
-        lcd.setCursor(0, 1);
-        lcd.print(error.c_str());
+        showMessage("JSON Error\n" + String(error.c_str()));
       } else {
         const char* message = doc["data"]["message"];
-        String msg = message;
-        
-        // Using all 4 lines (20x4 = 80 characters total)
-        if (msg.length() > 60) {
-          lcd.print(msg.substring(0, 20));
-          lcd.setCursor(0, 1);
-          lcd.print(msg.substring(20, 40));
-          lcd.setCursor(0, 2);
-          lcd.print(msg.substring(40, 60));
-          lcd.setCursor(0, 3);
-          lcd.print(msg.substring(60, 80));
-        } else if (msg.length() > 40) {
-          lcd.print(msg.substring(0, 20));
-          lcd.setCursor(0, 1);
-          lcd.print(msg.substring(20, 40));
-          lcd.setCursor(0, 2);
-          lcd.print(msg.substring(40));
-        } else if (msg.length() > 20) {
-          lcd.print(msg.substring(0, 20));
-          lcd.setCursor(0, 1);
-          lcd.print(msg.substring(20));
-        } else {
-          lcd.print(msg);
-        }
+        showMessage(message);
       }
     } else {
       Serial.println("Error on HTTP request");
       Serial.println("Error code: " + String(httpResponseCode));
       
-      lcd.print("Connection Error!");
-      lcd.setCursor(0, 1);
-      lcd.print("----------------");
-      lcd.setCursor(0, 2);
-      lcd.print("Please check your");
-      lcd.setCursor(0, 3);
-      lcd.print("network connection");
+      showMessage("Connection Error!\n\nCheck network");
     }
 
     http.end();
     
-    // Reset display after 3 seconds
     delay(3000);
-    lcd.clear();
-    lcd.print("System Ready!");
-    lcd.setCursor(0, 1);
-    lcd.print("----------------");
-    lcd.setCursor(0, 2);
-    lcd.print("Press button to mark");
-    lcd.setCursor(0, 3);
-    lcd.print("attendance");
+    showMessage("System Ready!\n\nPress button to mark attendance");
   }
 }
